@@ -1,6 +1,5 @@
 import pandas as pd
 from string import Template
-from pathlib import Path
 
 import warnings
 warnings.simplefilter("ignore")
