@@ -9,10 +9,6 @@ import torch
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
 
-DATA_PATH = Path("/kaggle/input/kaggle-llm-science-exam")
-MODEL_PATH = "/kaggle/input/flan-t5/pytorch/base/2"
-
-
 class T5Simple:
     def __init__(self, model_path, data_path):
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -64,3 +60,4 @@ class T5Simple:
             answer = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
             self.submission.loc[idx, 'prediction'] = self.post_process(answer)
         self.submission.to_csv("submission.csv")
+
