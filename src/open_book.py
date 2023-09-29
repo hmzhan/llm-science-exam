@@ -90,14 +90,44 @@ class OpenBook:
         question_embeddings = question_embeddings.detach().cpu().numpy()
         return question_embeddings
 
+    def create_prompt_context(self):
+        # Parameter to determine how many relevant sentences to include
+        NUM_SENTENCES_INCLUDE = 3
+        # List containing Question, Choices, Context
+        prompt_contexts = []
+        # List containing just Context
+        contexts = []
 
+        for r in self.train.itertuples():
+            prompt_context = ""
+            prompt_id = r.id
+            prompt_context += "Question: " + self.train.prompt.iloc[prompt_id] + "\n"
+            prompt_context += "Choices:\n"
+            prompt_context += "(A) " + self.train.A.iloc[prompt_id] + "\n"
+            prompt_context += "(B) " + self.train.B.iloc[prompt_id] + "\n"
+            prompt_context += "(C) " + self.train.C.iloc[prompt_id] + "\n"
+            prompt_context += "(D) " + self.train.D.iloc[prompt_id] + "\n"
+            prompt_context += "(E) " + self.train.E.iloc[prompt_id] + "\n"
 
+            prompt_indices = processed_wiki_text_data[processed_wiki_text_data['document_id'].isin(
+                wikipedia_file_data[wikipedia_file_data['prompt_id'] == prompt_id]['id'].values)].index.values
 
+            if prompt_indices.shape[0] > 0:
+                prompt_context += "Context:\n"
+                # Per Prompt Index
+                prompt_index = faiss.index_factory(wiki_data_embeddings.shape[1], "Flat")
+                prompt_index.add(wiki_data_embeddings[prompt_indices])
 
+                context = ""
 
+                # Get the top matches
+                ss, ii = prompt_index.search(question_embeddings, NUM_SENTENCES_INCLUDE)
+                for _s, _i in zip(ss[prompt_id], ii[prompt_id]):
+                    # Threshold on the score
+                    if _s < 2:
+                        context += processed_wiki_text_data.loc[prompt_indices]['text'].iloc[_i] + "\n"
+                prompt_context += context
 
-
-
-
-
+            contexts.append(context)
+            prompt_contexts.append(prompt_context)
 
