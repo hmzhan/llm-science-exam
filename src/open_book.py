@@ -1,10 +1,8 @@
 import gc
-import pandas as pd
 from pathlib import Path
 from config import *
 from sentence_transformers import SentenceTransformer
 from faiss import write_index, read_index
-from tqdm.auto import tqdm
 from src.utils import *
 
 
@@ -16,7 +14,7 @@ class OpenBook:
         self.model.max_seq_length = MAX_LENGTH
         self.model = self.model.half
 
-    def encode_prompt(self):
+    def _encode_prompt(self):
         prompt_embeddings = self.model.encode(
             self.train.prompt.values,
             batch_size=BATCH_SIZE,
@@ -28,13 +26,14 @@ class OpenBook:
         prompt_embeddings = prompt_embeddings.detach().cpu().numpy()
         return prompt_embeddings
 
-    def get_top_3_pages(self):
-        prompt_embeddings = self.encode_prompt()
+    def _get_top_3_pages(self):
+        prompt_embeddings = self._encode_prompt()
         search_score, search_index = self.sentence_index.search(prompt_embeddings, 3)
         _ = gc.collect()
         return search_score, search_index
 
-    def load_wiki_files(self, search_score, search_index):
+    def load_wiki_files(self):
+        search_score, search_index = self._get_top_3_pages()
         df = pd.read_parquet("/kaggle/input/wikipedia-20230701/wiki_2023_index.parquet", columns=['id', 'file'])
         wiki_file_data = []
         for i, (scr, idx) in tqdm(enumerate(zip(search_score, search_index)), total=len(search_score)):
@@ -58,13 +57,12 @@ class OpenBook:
             _ = gc.collect()
         wiki_text_data = pd.concat(wiki_text_data).drop_duplicates().reset_index(drop=True)
         _ = gc.collect()
-        return wiki_text_data
+        return process_documents(wiki_text_data.text.values, wiki_text_data.id.values)
 
-    def split_doc_into_sentences(self):
-        processed_wiki_text_data = process_documents(wiki_text_data.text.values, wiki_text_data.id.values)
+    def create_wiki_embedding(self, processed_wiki_data):
         # Get embeddings of the wiki text data
         wiki_data_embeddings = self.model.encode(
-            processed_wiki_text_data.text,
+            processed_wiki_data.text,
             batch_size=BATCH_SIZE,
             device=DEVICE,
             show_progress_bar=True,
@@ -90,7 +88,7 @@ class OpenBook:
         question_embeddings = question_embeddings.detach().cpu().numpy()
         return question_embeddings
 
-    def create_prompt_context(self):
+    def create_prompt_context(self, processed_wiki_data):
         # Parameter to determine how many relevant sentences to include
         NUM_SENTENCES_INCLUDE = 3
         # List containing Question, Choices, Context
@@ -109,7 +107,7 @@ class OpenBook:
             prompt_context += "(D) " + self.train.D.iloc[prompt_id] + "\n"
             prompt_context += "(E) " + self.train.E.iloc[prompt_id] + "\n"
 
-            prompt_indices = processed_wiki_text_data[processed_wiki_text_data['document_id'].isin(
+            prompt_indices = processed_wiki_data[processed_wiki_data['document_id'].isin(
                 wikipedia_file_data[wikipedia_file_data['prompt_id'] == prompt_id]['id'].values)].index.values
 
             if prompt_indices.shape[0] > 0:
@@ -125,7 +123,7 @@ class OpenBook:
                 for _s, _i in zip(ss[prompt_id], ii[prompt_id]):
                     # Threshold on the score
                     if _s < 2:
-                        context += processed_wiki_text_data.loc[prompt_indices]['text'].iloc[_i] + "\n"
+                        context += processed_wiki_data.loc[prompt_indices]['text'].iloc[_i] + "\n"
                 prompt_context += context
 
             contexts.append(context)
