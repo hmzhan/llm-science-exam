@@ -46,10 +46,13 @@ class OpenBook:
             .drop_duplicates().sort_values(['file', 'id']).reset_index(drop=True)
         del df
         _ = gc.collect()
+        return wiki_file_data
 
+    @staticmethod
+    def load_wiki_text(wiki_file_data):
         wiki_text_data = []
         for file in tqdm(wiki_file_data.file.unique(), total=len(wiki_file_data.file.unique())):
-            _id = [str(i) for i in wiki_file_data[wiki_file_data['file']==file]['id'].tolist()]
+            _id = [str(i) for i in wiki_file_data[wiki_file_data['file'] == file]['id'].tolist()]
             _df = pd.read_parquet(f"{WIKI_PATH}/{file}", columns=['id', 'text'])
 
             _df = _df[_df['id'].isin(_id)]
@@ -57,6 +60,10 @@ class OpenBook:
             _ = gc.collect()
         wiki_text_data = pd.concat(wiki_text_data).drop_duplicates().reset_index(drop=True)
         _ = gc.collect()
+        return wiki_text_data
+
+    @staticmethod
+    def process_wiki_text(wiki_text_data):
         return process_documents(wiki_text_data.text.values, wiki_text_data.id.values)
 
     def create_wiki_embedding(self, processed_wiki_data):
@@ -88,7 +95,7 @@ class OpenBook:
         question_embeddings = question_embeddings.detach().cpu().numpy()
         return question_embeddings
 
-    def create_prompt_context(self, processed_wiki_data):
+    def create_prompt_context(self, wiki_file_data, processed_wiki_data, wiki_data_embeddings, question_embeddings):
         # Parameter to determine how many relevant sentences to include
         NUM_SENTENCES_INCLUDE = 3
         # List containing Question, Choices, Context
@@ -108,16 +115,14 @@ class OpenBook:
             prompt_context += "(E) " + self.train.E.iloc[prompt_id] + "\n"
 
             prompt_indices = processed_wiki_data[processed_wiki_data['document_id'].isin(
-                wikipedia_file_data[wikipedia_file_data['prompt_id'] == prompt_id]['id'].values)].index.values
+                wiki_file_data[wiki_file_data['prompt_id'] == prompt_id]['id'].values)].index.values
 
             if prompt_indices.shape[0] > 0:
                 prompt_context += "Context:\n"
                 # Per Prompt Index
                 prompt_index = faiss.index_factory(wiki_data_embeddings.shape[1], "Flat")
                 prompt_index.add(wiki_data_embeddings[prompt_indices])
-
                 context = ""
-
                 # Get the top matches
                 ss, ii = prompt_index.search(question_embeddings, NUM_SENTENCES_INCLUDE)
                 for _s, _i in zip(ss[prompt_id], ii[prompt_id]):
@@ -125,7 +130,7 @@ class OpenBook:
                     if _s < 2:
                         context += processed_wiki_data.loc[prompt_indices]['text'].iloc[_i] + "\n"
                 prompt_context += context
-
             contexts.append(context)
             prompt_contexts.append(prompt_context)
 
+        return prompt_contexts
