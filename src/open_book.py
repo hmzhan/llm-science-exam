@@ -9,7 +9,6 @@ from src.utils import *
 class OpenBook:
     def __init__(self):
         self.train = pd.read_csv(Path(DATA_PATH) / "train.csv")
-        self.sentence_index = read_index(SENTENCE_INDEX_FILE)
         self.model = SentenceTransformer(MODEL, device="cuda")
         self.model.max_seq_length = MAX_LENGTH
         self.model = self.model.half()
@@ -28,7 +27,10 @@ class OpenBook:
 
     def _get_top_3_pages(self):
         prompt_embeddings = self._encode_prompt()
-        search_score, search_index = self.sentence_index.search(prompt_embeddings, 3)
+        sentence_index = read_index(SENTENCE_INDEX_FILE)
+        search_score, search_index = sentence_index.search(prompt_embeddings, 3)
+        del sentence_index
+        del prompt_embeddings
         _ = gc.collect()
         return search_score, search_index
 
