@@ -12,7 +12,7 @@ class OpenBook:
         self.sentence_index = read_index(SENTENCE_INDEX_FILE)
         self.model = SentenceTransformer(MODEL, device="cuda")
         self.model.max_seq_length = MAX_LENGTH
-        self.model = self.model.half
+        self.model = self.model.half()
 
     def _encode_prompt(self):
         prompt_embeddings = self.model.encode(
