@@ -62,8 +62,8 @@ class OpenBook:
         _ = gc.collect()
         return wiki_text_data
 
-    @staticmethod
-    def process_wiki_text(wiki_text_data):
+    def process_wiki_text(self, wiki_file_data):
+        wiki_text_data = self.load_wiki_text(wiki_file_data)
         return process_documents(wiki_text_data.text.values, wiki_text_data.id.values)
 
     def create_wiki_embedding(self, processed_wiki_data):
