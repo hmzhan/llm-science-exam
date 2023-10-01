@@ -5,6 +5,10 @@ from sentence_transformers import SentenceTransformer
 from faiss import write_index, read_index
 from src.utils import *
 
+import torch
+import ctypes
+libc = ctypes.CDLL("libc.so.6")
+
 
 class OpenBook:
     def __init__(self):
@@ -23,6 +27,7 @@ class OpenBook:
             normalize_embeddings=True
         ).half()
         prompt_embeddings = prompt_embeddings.detach().cpu().numpy()
+        _ = gc.collect()
         return prompt_embeddings
 
     def _get_top_3_pages(self):
@@ -32,6 +37,7 @@ class OpenBook:
         del sentence_index
         del prompt_embeddings
         _ = gc.collect()
+        libc.malloc_trim(0)
         return search_score, search_index
 
     def load_wiki_files(self):
