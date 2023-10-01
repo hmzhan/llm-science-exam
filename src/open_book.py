@@ -2,6 +2,8 @@ import gc
 from pathlib import Path
 from config import *
 from sentence_transformers import SentenceTransformer
+
+import faiss
 from faiss import write_index, read_index
 from src.utils import *
 
