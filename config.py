@@ -10,3 +10,5 @@ wiki_files = os.listdir(WIKI_PATH)
 
 SENTENCE_INDEX_FILE = "/kaggle/input/wikipedia-2023-07-faiss-index/wikipedia_202307.index"
 DATA_PATH = "/kaggle/input/kaggle-llm-science-exam/"
+
+LLM_DIR = "/kaggle/input/llm-se-debertav3-large"
