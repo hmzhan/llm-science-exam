@@ -26,17 +26,72 @@ class DataModule:
     def __init__(self):
         self.train_data = self._load_train_data()
         self.val_data = self._load_val_data()
+        self.tokenized_train_data = self.tokenize_data(self.train_data)
+        self.tokenized_val_data = self.tokenize_data(self.val_data)
 
     @staticmethod
-    def _load_train_data(self):
+    def _load_train_data():
         df_train = pd.read_csv('/kaggle/input/60k-data-with-context-v2/all_12_with_context2.csv')
         df_train = df_train.drop(columns="source")
         df_train = df_train.fillna('').sample(NUM_TRAIN_SAMPLES)
         return df_train
 
     @staticmethod
-    def _load_val_data(self):
+    def _load_val_data():
         return pd.read_csv('/kaggle/input/60k-data-with-context-v2/train_with_context2.csv')
+
+    def _preprocess(self, example):
+        option_to_index = {option: idx for idx, option in enumerate('ABCDE')}
+        index_to_option = {v: k for k, v in option_to_index.items()}
+
+        first_sentence = ['[CLS] ' + example['context']] * 5
+        second_sentence = [' #### ' + example['prompt'] + ' [SEP] ' + example[option] + ' [SEP]' for option in 'ABCDE']
+
+        tokenizer = AutoTokenizer.from_pretrained(model)
+        tokenized_example = tokenizer(
+            first_sentence,
+            second_sentence,
+            truncation='only_first',
+            max_length=MAX_INPUT,
+            add_special_tokens=False
+        )
+        tokenized_example['label'] = option_to_index[example['answer']]
+        return tokenized_example
+
+    def tokenize_data(self, data):
+        dataset = Dataset.from_pandas(data)
+        tokenized_dataset = dataset.map(self._preprocess,
+                                        remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer'])
+        return tokenized_dataset
+
+
+@dataclass
+class DataCollatorForMultipleChoice:
+    tokenizer: PreTrainedTokenizerBase
+    padding: Union[bool, str, PaddingStrategy] = True
+    max_length: Optional[int] = None
+    pad_to_multiple_of: Optional[int] = None
+
+    def __call__(self, features):
+        label_name = 'label' if 'label' in features[0].keys() else 'labels'
+        labels = [feature.pop(label_name) for feature in features]
+        batch_size = len(features)
+        num_choices = len(features[0]['input_ids'])
+        flattened_features = [
+            [{k: v[i] for k, v in feature.items()} for i in range(num_choices)] for feature in features
+        ]
+        flattened_features = sum(flattened_features, [])
+
+        batch = self.tokenizer.pad(
+            flattened_features,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors='pt',
+        )
+        batch = {k: v.view(batch_size, num_choices, -1) for k, v in batch.items()}
+        batch['labels'] = torch.tensor(labels, dtype=torch.int64)
+        return batch
 
 
 class ModelModule:
@@ -93,31 +148,4 @@ class TrainModule:
         return {'map@3': self._map_at_3(predictions, labels)}
 
 
-@dataclass
-class DataCollatorForMultipleChoice:
-    tokenizer: PreTrainedTokenizerBase
-    padding: Union[bool, str, PaddingStrategy] = True
-    max_length: Optional[int] = None
-    pad_to_multiple_of: Optional[int] = None
-
-    def __call__(self, features):
-        label_name = 'label' if 'label' in features[0].keys() else 'labels'
-        labels = [feature.pop(label_name) for feature in features]
-        batch_size = len(features)
-        num_choices = len(features[0]['input_ids'])
-        flattened_features = [
-            [{k: v[i] for k, v in feature.items()} for i in range(num_choices)] for feature in features
-        ]
-        flattened_features = sum(flattened_features, [])
-
-        batch = self.tokenizer.pad(
-            flattened_features,
-            padding=self.padding,
-            max_length=self.max_length,
-            pad_to_multiple_of=self.pad_to_multiple_of,
-            return_tensors='pt',
-        )
-        batch = {k: v.view(batch_size, num_choices, -1) for k, v in batch.items()}
-        batch['labels'] = torch.tensor(labels, dtype=torch.int64)
-        return batch
 
