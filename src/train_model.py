@@ -17,6 +17,11 @@ from transformers.tokenization_utils_base import (
     PreTrainedTokenizerBase,
     PaddingStrategy
 )
+from peft import (
+    LoraConfig,
+    get_peft_model,
+    TaskType
+)
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0.1'
@@ -58,8 +63,10 @@ class DataModule:
         tokenized_example['label'] = option_to_index[example['answer']]
         return tokenized_example
 
-    def tokenize_data(self, data):
+    def tokenize_data(self, data, train=True):
         dataset = Dataset.from_pandas(data)
+        if train:
+            dataset = dataset.remove_columns(['__index_level_0__'])
         tokenized_dataset = dataset.map(self._preprocess,
                                         remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E', 'answer'])
         return tokenized_dataset
@@ -95,8 +102,37 @@ class DataCollatorForMultipleChoice:
 
 
 class ModelModule:
-    def __init__(self, model):
+    def __init__(self, model, use_peft, freeze_embeddings, freeze_layers):
         self.llm = AutoModelForMultipleChoice.from_pretrained(model)
+        if use_peft:
+            self._adjust_model_peft()
+        if freeze_embeddings:
+            self._adjust_model_embedding()
+        if freeze_layers > 0:
+            self._adjust_model_layer()
+
+    def _adjust_model_peft(self):
+        peft_config = LoraConfig(
+            r=8,
+            lora_alpha=4,
+            task_type=TaskType.SEQ_CLS,
+            lora_dropout=0.1,
+            bias='none',
+            inference_model=False,
+            target_modules=['query_proj', 'value_proj'],
+            modules_to_save=['classifier', 'pooler']
+        )
+        self.llm = get_peft_model(self.llm, peft_config)
+        self.llm.print_trainable_parameters()
+
+    def _adjust_model_embedding(self):
+        for param in self.llm.deberta.embeddings.parameters():
+            param.requires_grad = False
+
+    def _adjust_model_layer(self, freeze_layers):
+        for layer in self.llm.deberta.encoder.layer[:freeze_layers]:
+            for param in layer.parameters():
+                param.requires_grad = False
 
 
 class TrainModule:
