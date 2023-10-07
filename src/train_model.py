@@ -25,6 +25,13 @@ from peft import (
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0.1'
+VERSION = 2
+NUM_TRAIN_SAMPLES = 1_024
+USE_PEFT = False
+FREEZE_LAYERS = 18
+FREEZE_EMBEDDINGS = True
+MAX_INPUT = 256
+MODEL = 'microsoft/deberta-v3-large'
 
 
 class DataModule:
@@ -45,14 +52,15 @@ class DataModule:
     def _load_val_data():
         return pd.read_csv('/kaggle/input/60k-data-with-context-v2/train_with_context2.csv')
 
-    def _preprocess(self, example):
+    @staticmethod
+    def _preprocess(example):
         option_to_index = {option: idx for idx, option in enumerate('ABCDE')}
         index_to_option = {v: k for k, v in option_to_index.items()}
 
         first_sentence = ['[CLS] ' + example['context']] * 5
         second_sentence = [' #### ' + example['prompt'] + ' [SEP] ' + example[option] + ' [SEP]' for option in 'ABCDE']
 
-        tokenizer = AutoTokenizer.from_pretrained(model)
+        tokenizer = AutoTokenizer.from_pretrained(MODEL)
         tokenized_example = tokenizer(
             first_sentence,
             second_sentence,
@@ -185,15 +193,15 @@ class TrainModule:
 
 
 class ValidationModule:
-    def __init__(self, use_peft, MODEL, VER):
-        self.model = self._load_trained_model(use_peft, MODEL, VER)
+    def __init__(self):
+        self.model = self._load_trained_model()
         self.test_data = self._load_test_data()
         self.tokenized_test_data = self._tokenize_test_data()
         self.trainer = Trainer(model=self.model)
 
     @staticmethod
-    def _load_trained_model(use_peft, MODEL, version):
-        if use_peft:
+    def _load_trained_model():
+        if USE_PEFT:
             peft_config = LoraConfig(
                 r=8,
                 lora_alpha=4,
@@ -206,18 +214,37 @@ class ValidationModule:
             )
             model = AutoModelForMultipleChoice.from_pretrained(MODEL)
             model = get_peft_model(model, peft_config)
-            checkpoint = torch.load(f'model_v{version}/pytorch_model.bin')
+            checkpoint = torch.load(f'model_v{VERSION}/pytorch_model.bin')
             return model.load_state_dict(checkpoint)
         else:
-            return AutoModelForMultipleChoice.from_pretrained(f'model_v{version}')
+            return AutoModelForMultipleChoice.from_pretrained(f'model_v{VERSION}')
 
     @staticmethod
     def _load_test_data():
         return pd.read_csv('/kaggle/input/60k-data-with-context-v2/train_with_context2.csv')
 
+    @staticmethod
+    def _preprocess(example):
+        option_to_index = {option: idx for idx, option in enumerate('ABCDE')}
+        index_to_option = {v: k for k, v in option_to_index.items()}
+
+        first_sentence = ['[CLS] ' + example['context']] * 5
+        second_sentence = [' #### ' + example['prompt'] + ' [SEP] ' + example[option] + ' [SEP]' for option in 'ABCDE']
+
+        tokenizer = AutoTokenizer.from_pretrained(MODEL)
+        tokenized_example = tokenizer(
+            first_sentence,
+            second_sentence,
+            truncation='only_first',
+            max_length=MAX_INPUT,
+            add_special_tokens=False
+        )
+        tokenized_example['label'] = option_to_index[example['answer']]
+        return tokenized_example
+
     def _tokenize_test_data(self):
         tokenized_test_dataset = Dataset.from_pandas(self.test_data).map(
-            preprocess, remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E'])
+            self._preprocess, remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E'])
         return tokenized_test_dataset
 
     def make_prediction(self):
@@ -249,4 +276,3 @@ class ValidationModule:
             for k in range(min(len(user_preds), 3)):
                 map_at_3 += self.precision_at_k(user_results, k+1) * user_results[k]
         return map_at_3 / U
-
