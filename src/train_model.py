@@ -184,4 +184,69 @@ class TrainModule:
         return {'map@3': self._map_at_3(predictions, labels)}
 
 
+class ValidationModule:
+    def __init__(self, use_peft, MODEL, VER):
+        self.model = self._load_trained_model(use_peft, MODEL, VER)
+        self.test_data = self._load_test_data()
+        self.tokenized_test_data = self._tokenize_test_data()
+        self.trainer = Trainer(model=self.model)
+
+    @staticmethod
+    def _load_trained_model(use_peft, MODEL, version):
+        if use_peft:
+            peft_config = LoraConfig(
+                r=8,
+                lora_alpha=4,
+                task_type=TaskType.SEQ_CLS,
+                lora_dropout=0.1,
+                bias='none',
+                inference_model=False,
+                target_modules=['query_proj', 'value_proj'],
+                modules_to_save=['classifier', 'pooler']
+            )
+            model = AutoModelForMultipleChoice.from_pretrained(MODEL)
+            model = get_peft_model(model, peft_config)
+            checkpoint = torch.load(f'model_v{version}/pytorch_model.bin')
+            return model.load_state_dict(checkpoint)
+        else:
+            return AutoModelForMultipleChoice.from_pretrained(f'model_v{version}')
+
+    @staticmethod
+    def _load_test_data():
+        return pd.read_csv('/kaggle/input/60k-data-with-context-v2/train_with_context2.csv')
+
+    def _tokenize_test_data(self):
+        tokenized_test_dataset = Dataset.from_pandas(self.test_data).map(
+            preprocess, remove_columns=['prompt', 'context', 'A', 'B', 'C', 'D', 'E'])
+        return tokenized_test_dataset
+
+    def make_prediction(self):
+        test_predictions = self.trainer.predict(self.tokenized_test_data).predictions
+        predictions_as_ids = np.argsort(-test_predictions, 1)
+        predictions_as_answer_letters = np.array(list('ABCDE'))[predictions_as_ids]
+        self.test_data['prediction'] = [
+            ' '.join(row) for row in predictions_as_answer_letters[:, :3]
+        ]
+
+    def calculat_map_at_3(self):
+        return self.MAP_at_3(self.test_data['prediction'].values, self.test_data['answer'].values)
+
+    @staticmethod
+    def precision_at_k(r, k):
+        """Precision at k"""
+        assert k <= len(r)
+        assert k != 0
+        return sum(int(x) for x in r[:k]) / k
+
+    def MAP_at_3(self, predictions, true_items):
+        """Score is mean average precision at 3"""
+        U = len(predictions)
+        map_at_3 = 0.0
+        for u in range(U):
+            user_preds = predictions[u].split()
+            user_true = true_items[u]
+            user_results = [1 if item == user_true else 0 for item in user_preds]
+            for k in range(min(len(user_preds), 3)):
+                map_at_3 += self.precision_at_k(user_results, k+1) * user_results[k]
+        return map_at_3 / U
 
