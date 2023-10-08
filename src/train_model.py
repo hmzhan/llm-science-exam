@@ -8,7 +8,7 @@ from datasets import Dataset
 from dataclasses import dataclass
 from transformers import (
     AutoTokenizer,
-    EarlyStoppingCallBack,
+    EarlyStoppingCallback,
     AutoModelForMultipleChoice,
     TrainingArguments,
     Trainer
@@ -110,13 +110,13 @@ class DataCollatorForMultipleChoice:
 
 
 class ModelModule:
-    def __init__(self, model, use_peft, freeze_embeddings, freeze_layers):
-        self.llm = AutoModelForMultipleChoice.from_pretrained(model)
-        if use_peft:
+    def __init__(self):
+        self.llm = AutoModelForMultipleChoice.from_pretrained(MODEL)
+        if USE_PEFT:
             self._adjust_model_peft()
-        if freeze_embeddings:
+        if FREEZE_EMBEDDINGS:
             self._adjust_model_embedding()
-        if freeze_layers > 0:
+        if FREEZE_LAYERS > 0:
             self._adjust_model_layer()
 
     def _adjust_model_peft(self):
