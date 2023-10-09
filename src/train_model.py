@@ -38,8 +38,8 @@ class DataModule:
     def __init__(self):
         self.train_data = self._load_train_data()
         self.val_data = self._load_val_data()
-        self.tokenized_train_data = self.tokenize_data(self.train_data)
-        self.tokenized_val_data = self.tokenize_data(self.val_data)
+        self.tokenized_train_data = self.tokenize_data(self.train_data, train=True)
+        self.tokenized_val_data = self.tokenize_data(self.val_data, train=False)
 
     @staticmethod
     def _load_train_data():
