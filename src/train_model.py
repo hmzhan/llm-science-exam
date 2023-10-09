@@ -112,6 +112,7 @@ class DataCollatorForMultipleChoice:
 class ModelModule:
     def __init__(self):
         self.llm = AutoModelForMultipleChoice.from_pretrained(MODEL)
+        self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
         if USE_PEFT:
             self._adjust_model_peft()
         if FREEZE_EMBEDDINGS:
@@ -144,7 +145,7 @@ class ModelModule:
 
 
 class TrainModule:
-    def __init__(self):
+    def __init__(self, model, data):
         self.training_args = TrainingArguments(
             warmup_ratio=0.1,
             learning_rate=2e-5,
@@ -152,7 +153,7 @@ class TrainModule:
             per_device_eval_batch_size=2,
             num_train_epochs=2,
             report_to='none',
-            output_dir=f'./checkpoints_{VER}',
+            output_dir=f'./checkpoints_{VERSION}',
             overwrite_output_dir=True,
             fp16=True,
             gradient_accumulation_steps=8,
@@ -168,12 +169,12 @@ class TrainModule:
             save_total_limit=2,
         )
         self.trainer = Trainer(
-            model=model,
+            model=model.llm,
             args=self.training_args,
-            tokenizer=tokenizer,
-            data_collator=DataCollatorForMultipleChoice(tokenizer=tokenizer),
-            train_dataset=tokenized_dataset,
-            eval_dataset=tokenized_dataset_valid,
+            tokenizer=model.tokenizer,
+            data_collator=DataCollatorForMultipleChoice(tokenizer=model.tokenizer),
+            train_dataset=data.tokenized_train_data,
+            eval_dataset=data.tokenized_val_data,
             compute_metrics=self.compute_metrics
         )
 
