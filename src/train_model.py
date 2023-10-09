@@ -138,8 +138,8 @@ class ModelModule:
         for param in self.llm.deberta.embeddings.parameters():
             param.requires_grad = False
 
-    def _adjust_model_layer(self, freeze_layers):
-        for layer in self.llm.deberta.encoder.layer[:freeze_layers]:
+    def _adjust_model_layer(self):
+        for layer in self.llm.deberta.encoder.layer[:FREEZE_LAYERS]:
             for param in layer.parameters():
                 param.requires_grad = False
 
