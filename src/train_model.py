@@ -260,7 +260,7 @@ class ValidationModule:
             ' '.join(row) for row in predictions_as_answer_letters[:, :3]
         ]
 
-    def calculat_map_at_3(self):
+    def calculate_map_at_3(self):
         return self.MAP_at_3(self.test_data['prediction'].values, self.test_data['answer'].values)
 
     @staticmethod
