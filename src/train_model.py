@@ -145,7 +145,7 @@ class ModelModule:
 
 
 class TrainModule:
-    def __init__(self, model, data):
+    def __init__(self):
         self.training_args = TrainingArguments(
             warmup_ratio=0.1,
             learning_rate=2e-5,
@@ -168,7 +168,9 @@ class TrainModule:
             weight_decay=0.01,
             save_total_limit=2,
         )
-        self.trainer = Trainer(
+
+    def fit(self, model, data):
+        trainer = Trainer(
             model=model.llm,
             args=self.training_args,
             tokenizer=model.tokenizer,
@@ -177,6 +179,8 @@ class TrainModule:
             eval_dataset=data.tokenized_val_data,
             compute_metrics=self.compute_metrics
         )
+        trainer.train()
+        trainer.save_model(f'model_v{VERSION}')
 
     @staticmethod
     def _map_at_3(predictions, labels):
