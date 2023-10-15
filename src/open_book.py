@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 import faiss
 from faiss import write_index, read_index
 from .utils import *
+from dataclasses import dataclass
 
 import torch
 import ctypes
