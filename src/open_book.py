@@ -13,15 +13,15 @@ libc = ctypes.CDLL("libc.so.6")
 
 
 class OpenBook:
-    def __init__(self):
-        self.train = pd.read_csv(Path(DATA_PATH) / "train.csv")
+    def __init__(self, prompt_data):
+        self.prompt_data = pd.read_csv(Path(DATA_PATH) / prompt_data)
         self.model = SentenceTransformer(MODEL, device="cuda")
         self.model.max_seq_length = MAX_LENGTH
         self.model = self.model.half()
 
     def _encode_prompt(self):
         prompt_embeddings = self.model.encode(
-            self.train.prompt.values,
+            self.prompt_data.prompt.values,
             batch_size=BATCH_SIZE,
             device=DEVICE,
             show_progress_bar=True,
@@ -91,11 +91,11 @@ class OpenBook:
         return wiki_data_embeddings
 
     def encode_question_answers(self):
-        self.train['answer_all'] = self.train.apply(lambda x: " ".join([x['A'], x['B'], x['C'], x['D'], x['E']]),
-                                                    axis=1)
-        self.train['prompt_answer_stem'] = self.train['prompt'] + " " + self.train['answer_all']
+        self.prompt_data['answer_all'] = self.prompt_data.apply(
+            lambda x: " ".join([x['A'], x['B'], x['C'], x['D'], x['E']]), axis=1)
+        self.prompt_data['prompt_answer_stem'] = self.prompt_data['prompt'] + " " + self.prompt_data['answer_all']
         question_embeddings = self.model.encode(
-            self.train.prompt_answer_stem.values,
+            self.prompt_data.prompt_answer_stem.values,
             batch_size=BATCH_SIZE,
             device=DEVICE,
             show_progress_bar=True,
@@ -113,16 +113,16 @@ class OpenBook:
         # List containing just Context
         contexts = []
 
-        for r in self.train.itertuples():
+        for r in self.prompt_data.itertuples():
             prompt_context = ""
             prompt_id = r.id
-            prompt_context += "Question: " + self.train.prompt.iloc[prompt_id] + "\n"
+            prompt_context += "Question: " + self.prompt_data.prompt.iloc[prompt_id] + "\n"
             prompt_context += "Choices:\n"
-            prompt_context += "(A) " + self.train.A.iloc[prompt_id] + "\n"
-            prompt_context += "(B) " + self.train.B.iloc[prompt_id] + "\n"
-            prompt_context += "(C) " + self.train.C.iloc[prompt_id] + "\n"
-            prompt_context += "(D) " + self.train.D.iloc[prompt_id] + "\n"
-            prompt_context += "(E) " + self.train.E.iloc[prompt_id] + "\n"
+            prompt_context += "(A) " + self.prompt_data.A.iloc[prompt_id] + "\n"
+            prompt_context += "(B) " + self.prompt_data.B.iloc[prompt_id] + "\n"
+            prompt_context += "(C) " + self.prompt_data.C.iloc[prompt_id] + "\n"
+            prompt_context += "(D) " + self.prompt_data.D.iloc[prompt_id] + "\n"
+            prompt_context += "(E) " + self.prompt_data.E.iloc[prompt_id] + "\n"
 
             prompt_indices = processed_wiki_data[processed_wiki_data['document_id'].isin(
                 wiki_file_data[wiki_file_data['prompt_id'] == prompt_id]['id'].values)].index.values
