@@ -1,6 +1,6 @@
 import gc
 from pathlib import Path
-from config import *
+from ..config import *
 from sentence_transformers import SentenceTransformer
 
 import faiss
