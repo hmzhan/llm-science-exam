@@ -1,13 +1,13 @@
 import gc
 from pathlib import Path
-from ..config import *
 from sentence_transformers import SentenceTransformer
 from typing import Optional, Union
 
 import faiss
 from faiss import write_index, read_index
-from .utils import *
 from dataclasses import dataclass
+from ..config import *
+from .utils import *
 
 from transformers.tokenization_utils_base import (
     PreTrainedTokenizerBase,
@@ -34,7 +34,7 @@ class OpenBook:
             show_progress_bar=True,
             convert_to_tensor=True,
             normalize_embeddings=True
-        ).half()
+        )
         prompt_embeddings = prompt_embeddings.detach().cpu().numpy()
         _ = gc.collect()
         return prompt_embeddings
