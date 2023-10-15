@@ -92,7 +92,7 @@ class OpenBook:
             show_progress_bar=True,
             convert_to_tensor=True,
             normalize_embeddings=True
-        ).half()
+        )
         wiki_data_embeddings = wiki_data_embeddings.detach().cpu().numpy()
         _ = gc.collect()
         return wiki_data_embeddings
