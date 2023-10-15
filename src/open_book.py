@@ -108,7 +108,7 @@ class OpenBook:
             show_progress_bar=True,
             convert_to_tensor=True,
             normalize_embeddings=True
-        ).half()
+        )
         question_embeddings = question_embeddings.detach().cpu().numpy()
         return question_embeddings
 
