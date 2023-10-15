@@ -2,11 +2,17 @@ import gc
 from pathlib import Path
 from ..config import *
 from sentence_transformers import SentenceTransformer
+from typing import Optional, Union
 
 import faiss
 from faiss import write_index, read_index
 from .utils import *
 from dataclasses import dataclass
+
+from transformers.tokenization_utils_base import (
+    PreTrainedTokenizerBase,
+    PaddingStrategy
+)
 
 import torch
 import ctypes
