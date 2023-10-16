@@ -150,7 +150,7 @@ class OpenBook:
             contexts.append(context)
             prompt_contexts.append(prompt_context)
 
-        return prompt_contexts
+        return contexts
 
 
 @dataclass
